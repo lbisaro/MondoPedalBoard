@@ -1,0 +1,15 @@
+# Build files
+build/
+*.DS_Store
+*.user
+
+# JUCE generated files / ide files
+JuceLibraryCode/
+.vs/
+*.vcxproj*
+*.sln
+*.xcodeproj/
+*.xcworkspace/
+
+# User Data
+/user_data/
