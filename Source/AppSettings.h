@@ -66,6 +66,11 @@ public:
         folder.getChildFile("Analysis_Data").createDirectory();
     }
 
+    juce::File getDIFolder() const
+    {
+        return juce::File(dataFolderPath).getChildFile("DI_Tracks");
+    }
+
     // Atomics para leer seguramente desde el hilo de audio
     std::atomic<int> processedInputChannel { 3 }; 
     std::atomic<int> playbackOutputChannel { 1 };

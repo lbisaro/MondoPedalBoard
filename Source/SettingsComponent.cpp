@@ -2,15 +2,6 @@
 
 SettingsComponent::SettingsComponent(AppSettings& s) : settings(s)
 {
-    addAndMakeVisible(titleLabel);
-    titleLabel.setText("PREFERENCES", juce::dontSendNotification);
-    titleLabel.setFont(juce::Font(22.0f, juce::Font::bold));
-    titleLabel.setJustificationType(juce::Justification::centred);
-
-    addAndMakeVisible(closeButton);
-    closeButton.setButtonText("✕");
-    // closeButton.setColour(...);
-    closeButton.onClick = [this] { if (onClose) onClose(); };
 
     setupComboBox(procInCombo, procInLabel, "Processed Input (Helix -> App):", settings.processedInputChannel.load(), true);
     setupComboBox(playOutCombo, playOutLabel, "Playback Output (App -> Helix):", settings.playbackOutputChannel.load(), true);
@@ -59,62 +50,36 @@ void SettingsComponent::setupComboBox(juce::ComboBox& box, juce::Label& label, c
     box.setSelectedId(selectedVal, juce::dontSendNotification);
 }
 
-void SettingsComponent::paint(juce::Graphics& g)
+void SettingsComponent::paint(juce::Graphics&)
 {
-    // Fondo oscurecido para dar foco al modal
-    g.fillAll(juce::Colours::black.withAlpha(0.7f));
-
-    auto panelBounds = getLocalBounds().reduced(40);
-    
-    juce::Colour bgColor = juce::Colour(0xff1e1e24);
-    juce::Colour outlineColor = juce::Colour(0xff3a3a45);
-
-    if (auto* lf = dynamic_cast<juce::LookAndFeel_V4*>(&getLookAndFeel()))
-    {
-        bgColor = lf->getCurrentColourScheme().getUIColour (juce::LookAndFeel_V4::ColourScheme::windowBackground);
-        outlineColor = lf->getCurrentColourScheme().getUIColour (juce::LookAndFeel_V4::ColourScheme::outline);
-    }
-
-    // Modal Box
-    g.setColour(bgColor);
-    g.fillRoundedRectangle(panelBounds.toFloat(), 12.0f);
-
-    // Borde sutil
-    g.setColour(outlineColor);
-    g.drawRoundedRectangle(panelBounds.toFloat(), 12.0f, 1.5f);
+    // El fondo principal ya lo provee la ventana del módulo global
 }
 
 void SettingsComponent::resized()
 {
-    auto panelBounds = getLocalBounds().reduced(40);
-    auto bounds = panelBounds.reduced(25); // Padding interno del modal
+    // Centramos elegantemente el bloque de preferencias en el área disponible
+    auto bounds = getLocalBounds().reduced(20).withSizeKeepingCentre(550, 260);
     
-    auto header = bounds.removeFromTop(40);
-    closeButton.setBounds(header.removeFromRight(30).reduced(5));
-    titleLabel.setBounds(header);
-
-    bounds.removeFromTop(20); // Espaciador
-
     auto row1 = bounds.removeFromTop(35);
-    procInLabel.setBounds(row1.removeFromLeft(220));
+    procInLabel.setBounds(row1.removeFromLeft(240));
     procInCombo.setBounds(row1.reduced(0, 3));
 
-    bounds.removeFromTop(10);
+    bounds.removeFromTop(15);
 
     auto row2 = bounds.removeFromTop(35);
-    playOutLabel.setBounds(row2.removeFromLeft(220));
+    playOutLabel.setBounds(row2.removeFromLeft(240));
     playOutCombo.setBounds(row2.reduced(0, 3));
 
-    bounds.removeFromTop(10);
+    bounds.removeFromTop(15);
 
     auto row3 = bounds.removeFromTop(35);
-    diInLabel.setBounds(row3.removeFromLeft(220));
+    diInLabel.setBounds(row3.removeFromLeft(240));
     diInCombo.setBounds(row3.reduced(0, 3));
 
     bounds.removeFromTop(30);
 
     auto row4 = bounds.removeFromTop(35);
     folderLabel.setBounds(row4.removeFromLeft(120));
-    browseButton.setBounds(row4.removeFromRight(90).reduced(0, 3));
-    folderPathLabel.setBounds(row4.reduced(5, 5));
+    browseButton.setBounds(row4.removeFromRight(100).reduced(0, 3));
+    folderPathLabel.setBounds(row4.reduced(10, 3));
 }

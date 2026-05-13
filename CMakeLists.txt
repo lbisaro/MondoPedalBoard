@@ -58,6 +58,14 @@ target_sources(MondoHelixAnalyzer PRIVATE
     Source/CustomLookAndFeel.h
     Source/FrequencyGraphComponent.cpp
     Source/FrequencyGraphComponent.h
+    Source/PresetAnalyzerViewComponent.cpp
+    Source/PresetAnalyzerViewComponent.h
+    Source/HomeViewComponent.cpp
+    Source/HomeViewComponent.h
+    Source/GuitarDIListViewComponent.cpp
+    Source/GuitarDIListViewComponent.h
+    Source/GuitarDIRecorderViewComponent.cpp
+    Source/GuitarDIRecorderViewComponent.h
 )
 
 # (Se eliminó la opción PCH temporalmente por problemas de parseo en CMake/MSVC)

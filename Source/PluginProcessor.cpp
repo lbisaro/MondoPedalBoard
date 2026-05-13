@@ -34,6 +34,13 @@ void MondoHelixAnalyzerAudioProcessor::prepareToPlay (double sampleRate, int sam
 {
     juce::ignoreUnused (samplesPerBlock);
     analyzer.prepare(sampleRate);
+
+    currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
+    
+    // Asignar búfer para hasta 5 minutos de grabación DI mono en RAM
+    diRecordBuffer.setSize (1, static_cast<int>(currentSampleRate * 60.0 * 5.0));
+    diRecordBuffer.clear();
+    diRecordSampleCount.store (0);
 }
 
 void MondoHelixAnalyzerAudioProcessor::releaseResources()
@@ -67,30 +74,41 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
     for (auto i = 0; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    bool hasProcessedAudio = false; 
-    bool hasDryDI = false;          
-
-    if (totalNumInputChannels > juce::jmax(procIdx + 1, diIdx))
+    // 1. Procesamiento independiente de la señal DI
+    float maxDI = 0.0f;
+    if (diIdx >= 0 && diIdx < totalNumInputChannels)
     {
-        auto* channelL = buffer.getReadPointer(procIdx);
-        auto* channelR = buffer.getReadPointer(procIdx + 1);
         auto* channelDI = buffer.getReadPointer(diIdx);
-
-        float maxProcessed = 0.0f;
-        float maxDI = 0.0f;
-
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
         {
-            maxProcessed = juce::jmax(maxProcessed, std::abs(channelL[sample]), std::abs(channelR[sample]));
             maxDI = juce::jmax(maxDI, std::abs(channelDI[sample]));
         }
 
-        // Detección simple para ver si entra señal
-        if (maxProcessed > 0.0001f) hasProcessedAudio = true;
-        if (maxDI > 0.0001f) hasDryDI = true;
+        // Copiar muestras de la DI a memoria si la grabación está activa
+        if (recordingState.load() == RecordingState::Recording)
+        {
+            int currentCount = diRecordSampleCount.load();
+            int maxSamples = diRecordBuffer.getNumSamples();
+            auto* writePtr = diRecordBuffer.getWritePointer(0);
 
+            for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+            {
+                if (currentCount < maxSamples)
+                {
+                    writePtr[currentCount] = channelDI[sample];
+                    currentCount++;
+                }
+            }
+            diRecordSampleCount.store (currentCount);
+        }
+    }
+    diInputLevel.store (maxDI);
+
+    // 2. Procesamiento del audio estéreo principal para el Analyzer
+    if (procIdx >= 0 && procIdx + 1 < totalNumInputChannels)
+    {
         // Pasamos el audio procesado al analyzer para las métricas
-        analyzer.processBlock (buffer, procIdx, diIdx);
+        analyzer.processBlock (buffer, procIdx, diIdx < totalNumInputChannels ? diIdx : procIdx);
     }
 
     // Pass-through básico de los canales procesados hacia la salida estéreo configurada
@@ -124,4 +142,72 @@ void MondoHelixAnalyzerAudioProcessor::setStateInformation (const void* data, in
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new MondoHelixAnalyzerAudioProcessor();
+}
+
+// =============================================================================
+// Control de Grabación DI
+// =============================================================================
+void MondoHelixAnalyzerAudioProcessor::startDIRecording()
+{
+    diRecordBuffer.clear();
+    diRecordSampleCount.store (0);
+    recordingState.store (RecordingState::Recording);
+}
+
+void MondoHelixAnalyzerAudioProcessor::stopDIRecording()
+{
+    recordingState.store (RecordingState::Stopped);
+}
+
+bool MondoHelixAnalyzerAudioProcessor::saveRecordedDI (const juce::String& fileName)
+{
+    int totalSamples = diRecordSampleCount.load();
+    if (totalSamples <= 0)
+        return false;
+
+    // Aplicar Fade In y Fade Out lineales de 30ms para evitar clics de bucle
+    int fadeLen = static_cast<int>(currentSampleRate * 0.03);
+    fadeLen = juce::jmin (fadeLen, totalSamples / 2);
+
+    auto* samples = diRecordBuffer.getWritePointer(0);
+
+    // Fade In lineal
+    for (int i = 0; i < fadeLen; ++i)
+    {
+        float factor = static_cast<float>(i) / static_cast<float>(fadeLen);
+        samples[i] *= factor;
+    }
+
+    // Fade Out lineal
+    for (int i = 0; i < fadeLen; ++i)
+    {
+        int sampleIdx = totalSamples - 1 - i;
+        float factor = static_cast<float>(i) / static_cast<float>(fadeLen);
+        samples[sampleIdx] *= factor;
+    }
+
+    // Limpiar y asegurar extensión .wav
+    juce::String cleanName = fileName.trim();
+    if (cleanName.isEmpty())
+        cleanName = "Guitar_DI_Track";
+        
+    if (! cleanName.endsWithIgnoreCase(".wav"))
+        cleanName += ".wav";
+
+    juce::File targetFile = settings.getDIFolder().getChildFile(cleanName);
+    
+    // Usamos la clase de formato WAV nativa para escribir el archivo
+    juce::WavAudioFormat wavFormat;
+    if (auto* writer = wavFormat.createWriterFor (new juce::FileOutputStream(targetFile),
+                                                  currentSampleRate,
+                                                  1,  // 1 canal (Mono)
+                                                  24, // 24 bits
+                                                  {}, 0))
+    {
+        std::unique_ptr<juce::AudioFormatWriter> scopedWriter(writer);
+        bool success = scopedWriter->writeFromAudioSampleBuffer (diRecordBuffer, 0, totalSamples);
+        return success;
+    }
+
+    return false;
 }

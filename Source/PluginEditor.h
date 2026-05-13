@@ -3,9 +3,12 @@
 #include "PluginProcessor.h"
 #include "SettingsComponent.h"
 #include "CustomLookAndFeel.h"
-#include "FrequencyGraphComponent.h"
+#include "HomeViewComponent.h"
+#include "GuitarDIListViewComponent.h"
+#include "GuitarDIRecorderViewComponent.h"
+#include "PresetAnalyzerViewComponent.h"
 
-class MondoHelixAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor, private juce::Timer
+class MondoHelixAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
     MondoHelixAnalyzerAudioProcessorEditor (MondoHelixAnalyzerAudioProcessor&);
@@ -13,20 +16,26 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
-    void timerCallback() override;
+
 
 private:
     MondoHelixAnalyzerAudioProcessor& audioProcessor;
 
-    juce::Label lufsLabel;
-    juce::Label plrLabel;
-    juce::Label categoryLabel;
-    juce::TextButton settingsButton;
-
+    juce::ShapeButton settingsButton;
     std::unique_ptr<SettingsComponent> settingsPanel;
 
-    FrequencyGraphComponent frequencyGraph;
+    // Vistas / Módulos de la Suite
+    std::unique_ptr<HomeViewComponent> homeView;
+    std::unique_ptr<GuitarDIListViewComponent> diListView;
+    std::unique_ptr<GuitarDIRecorderViewComponent> diRecorderView;
+    std::unique_ptr<PresetAnalyzerViewComponent> analyzerView;
 
+    juce::Component* currentView = nullptr;
+    juce::String currentModuleTitle;
+    juce::ShapeButton homeButton;
+    juce::Label moduleTitleLabel;
+
+    void showView (juce::Component* newView, const juce::String& moduleTitle = "");
 
     CustomLookAndFeel customLookAndFeel;
 

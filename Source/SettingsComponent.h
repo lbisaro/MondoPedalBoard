@@ -11,13 +11,8 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
-    std::function<void()> onClose;
-
 private:
     AppSettings& settings;
-
-    juce::Label titleLabel;
-    juce::TextButton closeButton;
 
     juce::Label procInLabel;
     juce::ComboBox procInCombo;

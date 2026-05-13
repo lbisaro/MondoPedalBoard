@@ -46,65 +46,60 @@ public:
     // ¡AHORA SÍ! Puedes pegar exactamente el código que te da VS Code.
     // =========================================================================
 
-    // Color principal que ves en el fondo de las ventanas y paneles generales.
-    juce::String strWindowBackground = "1e1e1e"; // #1e1e1e
+    // Color principal de fondo de ventanas y paneles generales.
+    juce::String strWindowBackground = "1a1a24"; // Gris-azul ultra profundo
 
-    // Color de fondo para controles como las cajas de texto o el área interna
-    // de listas.
-    juce::String strWidgetBackground = "252526"; // #252526
+    // Color de fondo para controles (cajas de texto, combo boxes, listas).
+    juce::String strWidgetBackground = "22222f";
 
     // Fondo para menús desplegables (Pop-up Menus).
-    juce::String strMenuBackground = "ffd0d0d0"; // #ffd0d0d0
+    juce::String strMenuBackground = "2a2a3a"; // Tono oscuro azulado elegante
 
-    // Para dibujar los bordes y contornos de botones, ventanas y sliders.
-    juce::String strOutline = "007acc"; // #007acc
+    // Bordes y contornos limpios.
+    juce::String strOutline = "3a3a4f";
 
-    // Color principal de la tipografía (etiquetas, texto de botones, etc).
-    juce::String strDefaultText = "c8ffffff"; // #c8ffffff
+    // Color principal de la tipografía.
+    juce::String strDefaultText = "e0e0e0";
 
-    // Para los rellenos por defecto (como el cuerpo de un slider cuando no está
-    // activo).
-    juce::String strDefaultFill = "ffd8d8d8"; // #ffd8d8d8
+    // Rellenos inactivos genéricos.
+    juce::String strDefaultFill = "404055";
 
-    // Para el texto cuando pasas el mouse por encima o seleccionas un elemento.
-    juce::String strHighlightedText = "ffffffff"; // #ffffffff
+    // Texto resaltado o al pasar el mouse.
+    juce::String strHighlightedText = "ffffff";
 
-    // Para el "brillo" o resalte cuando un botón está presionado o un área está
-    // seleccionada.
-    juce::String strHighlightedFill = "7cdcfe"; // #7cdcfe
+    // Relleno de selección/resalte (Azul corporativo premium).
+    juce::String strHighlightedFill = "1e73be";
 
-    // Para el texto dentro de los menús desplegables (que tienen fondo claro).
-    juce::String strMenuText = "ff000000"; // #ff000000
+    // Texto dentro de los menús desplegables.
+    juce::String strMenuText = "ffffff";
 
     // =========================================================================
     // 2. APLICACIÓN DE LOS COLORES AL ESQUEMA
     // =========================================================================
-
-    // Creamos una paleta basada en Midnight como punto de partida
     auto scheme = juce::LookAndFeel_V4::getMidnightColourScheme();
 
-    // Transformamos los strings a hexadecimal usando nuestro nuevo helper
-    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::windowBackground,
-                       parseWebColor(strWindowBackground));
-    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::widgetBackground,
-                       parseWebColor(strWidgetBackground));
-    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::menuBackground,
-                       parseWebColor(strMenuBackground));
-    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::outline,
-                       parseWebColor(strOutline));
-    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::defaultText,
-                       parseWebColor(strDefaultText));
-    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::defaultFill,
-                       parseWebColor(strDefaultFill));
-    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::highlightedText,
-                       parseWebColor(strHighlightedText));
-    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::highlightedFill,
-                       parseWebColor(strHighlightedFill));
-    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::menuText,
-                       parseWebColor(strMenuText));
+    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::windowBackground, parseWebColor(strWindowBackground));
+    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::widgetBackground, parseWebColor(strWidgetBackground));
+    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::menuBackground, parseWebColor(strMenuBackground));
+    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::outline, parseWebColor(strOutline));
+    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::defaultText, parseWebColor(strDefaultText));
+    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::defaultFill, parseWebColor(strDefaultFill));
+    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::highlightedText, parseWebColor(strHighlightedText));
+    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::highlightedFill, parseWebColor(strHighlightedFill));
+    scheme.setUIColour(juce::LookAndFeel_V4::ColourScheme::menuText, parseWebColor(strMenuText));
 
-    // Aplicamos nuestro esquema personalizado al LookAndFeel
     setColourScheme(scheme);
+
+    // Sobrescribimos explícitamente los IDs de Popups y ComboBoxes para garantizar el estilo Dark UI
+    setColour (juce::PopupMenu::backgroundColourId, parseWebColor("2a2a3a"));
+    setColour (juce::PopupMenu::textColourId, parseWebColor("ffffff"));
+    setColour (juce::PopupMenu::highlightedBackgroundColourId, parseWebColor("1e73be"));
+    setColour (juce::PopupMenu::highlightedTextColourId, parseWebColor("ffffff"));
+
+    setColour (juce::ComboBox::backgroundColourId, parseWebColor("22222f"));
+    setColour (juce::ComboBox::textColourId, parseWebColor("ffffff"));
+    setColour (juce::ComboBox::outlineColourId, parseWebColor("3a3a4f"));
+    setColour (juce::ComboBox::arrowColourId, parseWebColor("5ba5ef"));
 
     // =========================================================================
     // 3. COLORES CUSTOM (DATA Y ESTADOS)

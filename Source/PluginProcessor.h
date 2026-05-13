@@ -35,6 +35,21 @@ public:
     AnalysisEngine analyzer;
     AppSettings settings;
 
+    // =========================================================================
+    // Sistema de Grabación de DI en RAM
+    // =========================================================================
+    enum class RecordingState { Stopped, Countdown, Recording };
+    std::atomic<RecordingState> recordingState { RecordingState::Stopped };
+    std::atomic<float> diInputLevel { 0.0f };
+
+    void startDIRecording();
+    void stopDIRecording();
+    bool saveRecordedDI (const juce::String& fileName);
+
 private:
+    juce::AudioBuffer<float> diRecordBuffer;
+    std::atomic<int> diRecordSampleCount { 0 };
+    double currentSampleRate = 44100.0;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MondoHelixAnalyzerAudioProcessor)
 };
