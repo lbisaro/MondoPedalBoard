@@ -118,18 +118,31 @@ public:
         std::fill (latestFFTData.begin(), latestFFTData.end(), 0.0f);
     }
 
-    void processBlock (const juce::AudioBuffer<float>& buffer)
+    void processBlock (const juce::AudioBuffer<float>& buffer, int procIdx, int diIdx)
     {
         // 1. Dinámica (True Peak, LUFS, PLR)
         float currentPeak = 0.0f;
-        for (int ch = 0; ch < juce::jmin(2, buffer.getNumChannels()); ++ch)
-        {
-            currentPeak = juce::jmax (currentPeak, buffer.getMagnitude (ch, 0, buffer.getNumSamples()));
-        }
         
+        // Asumimos que procIdx y procIdx+1 son válidos si numChannels lo permite
+        if (buffer.getNumChannels() > procIdx)
+            currentPeak = juce::jmax (currentPeak, buffer.getMagnitude (procIdx, 0, buffer.getNumSamples()));
+        if (buffer.getNumChannels() > procIdx + 1)
+            currentPeak = juce::jmax (currentPeak, buffer.getMagnitude (procIdx + 1, 0, buffer.getNumSamples()));
+            
         float peakDb = juce::Decibels::gainToDecibels (currentPeak, -120.0f);
         
-        lufsMeter.process (buffer);
+        // Para el LufsMeter necesitamos pasar solo los canales de procesado
+        if (buffer.getNumChannels() > procIdx + 1)
+        {
+            juce::AudioBuffer<float> procBuffer (2, buffer.getNumSamples());
+            procBuffer.copyFrom (0, 0, buffer, procIdx, 0, buffer.getNumSamples());
+            procBuffer.copyFrom (1, 0, buffer, procIdx + 1, 0, buffer.getNumSamples());
+            lufsMeter.process (procBuffer);
+        }
+        else
+        {
+            lufsMeter.process (buffer); // fallback
+        }
         
         float currentMomentary = lufsMeter.getMomentaryLUFS();
         float currentShortTerm = lufsMeter.getShortTermLUFS();
@@ -140,9 +153,9 @@ public:
         currentPLR.store (plr);
 
         // 2. Análisis Espectral (FFT)
-        if (buffer.getNumChannels() > 0)
+        if (buffer.getNumChannels() > procIdx)
         {
-            auto* channelData = buffer.getReadPointer (0); // Analizamos canal L (procesado)
+            auto* channelData = buffer.getReadPointer (procIdx); // Analizamos canal L (procesado)
             for (int i = 0; i < buffer.getNumSamples(); ++i)
                 pushNextSampleIntoFifo (channelData[i]);
         }
@@ -208,8 +221,21 @@ public:
         float flatness = arithmeticMean > 0.0f ? geometricMean / arithmeticMean : 0.0f;
         spectralFlatness.store (flatness);
 
-        // Copiamos datos listos para el UI
-        std::copy(fftData.begin(), fftData.begin() + numBins, latestFFTData.begin());
+        // Suavizado temporal de la FFT (Attack rápido, Decay lento)
+        const float attack = 0.3f; // 0.0 es instantáneo, 1.0 es congelado
+        const float decay = 0.85f; 
+        
+        for (int i = 0; i < numBins; ++i)
+        {
+            float current = latestFFTData[i];
+            float next = fftData[i];
+            
+            if (next > current)
+                latestFFTData[i] = attack * current + (1.0f - attack) * next; // Sube rápido
+            else
+                latestFFTData[i] = decay * current + (1.0f - decay) * next;   // Baja más lento
+        }
+
         fftDataReady.store(true);
     }
 

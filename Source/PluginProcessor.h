@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "AnalysisEngine.h"
+#include "AppSettings.h"
 
 class MondoHelixAnalyzerAudioProcessor : public juce::AudioProcessor
 {
@@ -32,6 +33,7 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     AnalysisEngine analyzer;
+    AppSettings settings;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MondoHelixAnalyzerAudioProcessor)

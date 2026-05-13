@@ -21,6 +21,8 @@ juce_add_plugin(MondoHelixAnalyzer
     PLUGIN_CODE "Mhza"
     FORMATS Standalone VST3
     PRODUCT_NAME "Mondo Helix Analyzer"
+    ICON_BIG "Assets/icon.png"
+    ICON_SMALL "Assets/icon.png"
 )
 
 # Generar el JuceHeader.h
@@ -49,7 +51,16 @@ target_sources(MondoHelixAnalyzer PRIVATE
     Source/PluginProcessor.h
     Source/PluginEditor.cpp
     Source/PluginEditor.h
+    Source/AnalysisEngine.h
+    Source/AppSettings.h
+    Source/SettingsComponent.cpp
+    Source/SettingsComponent.h
+    Source/CustomLookAndFeel.h
+    Source/FrequencyGraphComponent.cpp
+    Source/FrequencyGraphComponent.h
 )
+
+# (Se eliminó la opción PCH temporalmente por problemas de parseo en CMake/MSVC)
 
 # Link to JUCE modules
 target_link_libraries(MondoHelixAnalyzer PRIVATE

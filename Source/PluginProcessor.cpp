@@ -59,18 +59,22 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // Limpiar canales de salida que no tienen entrada correspondiente
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+    int procIdx = settings.processedInputChannel.load() - 1; // 1-based to 0-based index
+    int diIdx = settings.diInputChannel.load() - 1;
+    int outIdx = settings.playbackOutputChannel.load() - 1;
+
+    // Limpiar canales de salida que no tienen entrada correspondiente o que no sean el principal
+    for (auto i = 0; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    bool hasProcessedAudio = false; // Helix Channels 1/2 (índices 0/1)
-    bool hasDryDI = false;          // Helix Channel 7 (índice 6)
+    bool hasProcessedAudio = false; 
+    bool hasDryDI = false;          
 
-    if (totalNumInputChannels >= 8)
+    if (totalNumInputChannels > juce::jmax(procIdx + 1, diIdx))
     {
-        auto* channelL = buffer.getReadPointer(0);
-        auto* channelR = buffer.getReadPointer(1);
-        auto* channelDI = buffer.getReadPointer(6);
+        auto* channelL = buffer.getReadPointer(procIdx);
+        auto* channelR = buffer.getReadPointer(procIdx + 1);
+        auto* channelDI = buffer.getReadPointer(diIdx);
 
         float maxProcessed = 0.0f;
         float maxDI = 0.0f;
@@ -86,17 +90,14 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
         if (maxDI > 0.0001f) hasDryDI = true;
 
         // Pasamos el audio procesado al analyzer para las métricas
-        analyzer.processBlock (buffer);
+        analyzer.processBlock (buffer, procIdx, diIdx);
     }
 
-    // Pass-through básico de los canales procesados (1 y 2) hacia la salida estéreo
-    if (totalNumInputChannels >= 2 && totalNumOutputChannels >= 2)
+    // Pass-through básico de los canales procesados hacia la salida estéreo configurada
+    if (totalNumInputChannels > procIdx + 1 && totalNumOutputChannels > outIdx + 1)
     {
-        // Limpiamos los canales a partir del 2 para que no suenen en el bus de salida
-        for (int i = 2; i < totalNumInputChannels; ++i)
-        {
-            buffer.clear(i, 0, buffer.getNumSamples());
-        }
+        buffer.copyFrom(outIdx, 0, buffer, procIdx, 0, buffer.getNumSamples());
+        buffer.copyFrom(outIdx + 1, 0, buffer, procIdx + 1, 0, buffer.getNumSamples());
     }
 }
 
