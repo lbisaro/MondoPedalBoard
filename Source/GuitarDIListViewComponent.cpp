@@ -1,4 +1,5 @@
 #include "GuitarDIListViewComponent.h"
+#include "PluginProcessor.h"
 
 // =============================================================================
 // DIRowComponent
@@ -6,6 +7,7 @@
 DIRowComponent::DIRowComponent (const juce::File& f, std::function<void(juce::File)> onDelete)
     : file (f)
 {
+
     addAndMakeVisible (deleteButton);
     deleteButton.setButtonText ("Eliminar");
     
@@ -86,7 +88,6 @@ void DIRowComponent::mouseExit (const juce::MouseEvent&)
 GuitarDIListViewComponent::GuitarDIListViewComponent (AppSettings& s)
     : appSettings (s)
 {
-    // No back button per design
     addAndMakeVisible (recordNewButton);
     recordNewButton.onClick = [this] { if (onRecordNewRequested) onRecordNewRequested(); };
 
@@ -151,9 +152,7 @@ void GuitarDIListViewComponent::resized()
     auto bounds = getLocalBounds().reduced (20);
 
     auto header = bounds.removeFromTop (40);
-    // Solo el botón de grabar ocupa todo el ancho del header
     recordNewButton.setBounds (header);
-
 
     bounds.removeFromTop (20); // Espaciador
 
