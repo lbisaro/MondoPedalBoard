@@ -86,7 +86,6 @@ public:
 private:
     AppSettings& appSettings;
 
-    // juce::TextButton backButton; // removed per design
     PlusIconButton recordNewButton;
     
     juce::Viewport viewport;
