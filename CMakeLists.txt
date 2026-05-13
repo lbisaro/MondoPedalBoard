@@ -23,6 +23,9 @@ juce_add_plugin(MondoHelixAnalyzer
     PRODUCT_NAME "Mondo Helix Analyzer"
 )
 
+# Generar el JuceHeader.h
+juce_generate_juce_header(MondoHelixAnalyzer)
+
 # Target configuration flags
 target_compile_definitions(MondoHelixAnalyzer PUBLIC
     JUCE_WEB_BROWSER=0
