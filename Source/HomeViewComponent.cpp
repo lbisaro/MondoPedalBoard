@@ -117,6 +117,14 @@ HomeViewComponent::HomeViewComponent()
     );
     addAndMakeVisible (presetComparerCard.get());
     presetComparerCard->onClick = [this] { if (onModuleSelected) onModuleSelected(2); };
+
+    samplesAnalyzerCard = std::make_unique<ModuleCardComponent>(
+        "Samples Analyzer", 
+        "Analiza archivos WAV/MP3 offline con el algoritmo de la suite. Guarda referencias de tonos legendarios (LUFS/PLR/Centroid) y usalas como objetivos.", 
+        CustomLookAndFeel::defaultColourId
+    );
+    addAndMakeVisible (samplesAnalyzerCard.get());
+    samplesAnalyzerCard->onClick = [this] { if (onModuleSelected) onModuleSelected(3); };
 }
 
 void HomeViewComponent::paint (juce::Graphics&)
@@ -140,4 +148,5 @@ void HomeViewComponent::resized()
 
     // Fila 2
     presetComparerCard->setBounds (bounds.getX(), bounds.getY() + cardHeight + cardGap, cardWidth, cardHeight);
+    samplesAnalyzerCard->setBounds (bounds.getX() + cardWidth + cardGap, bounds.getY() + cardHeight + cardGap, cardWidth, cardHeight);
 }

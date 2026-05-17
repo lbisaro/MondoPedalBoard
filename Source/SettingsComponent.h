@@ -23,6 +23,9 @@ private:
     juce::Label diInLabel;
     juce::ComboBox diInCombo;
 
+    juce::Label smoothingLabel;
+    juce::ComboBox smoothingCombo;
+
     juce::Label folderLabel;
     juce::Label folderPathLabel;
     juce::TextButton browseButton;

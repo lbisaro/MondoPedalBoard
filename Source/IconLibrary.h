@@ -140,6 +140,77 @@ public:
         return strokedPath;
     }
 
+    static juce::Path getPlayPath()
+    {
+        juce::Path p;
+        p.startNewSubPath (16.6582f, 9.28638f);
+        p.cubicTo (18.098f, 10.1862f, 18.8178f, 10.6361f, 19.0647f, 11.2122f);
+        p.cubicTo (19.2803f, 11.7152f, 19.2803f, 12.2847f, 19.0647f, 12.7878f);
+        p.cubicTo (18.8178f, 13.3638f, 18.098f, 13.8137f, 16.6582f, 14.7136f);
+        p.lineTo (9.896f, 18.94f);
+        p.cubicTo (8.29805f, 19.9387f, 7.49907f, 20.4381f, 6.83973f, 20.385f);
+        p.cubicTo (6.26501f, 20.3388f, 5.73818f, 20.0469f, 5.3944f, 19.584f);
+        p.cubicTo (5.0f, 19.053f, 5.0f, 18.1108f, 5.0f, 16.2264f);
+        p.lineTo (5.0f, 7.77357f);
+        p.cubicTo (5.0f, 5.88919f, 5.0f, 4.94701f, 5.3944f, 4.41598f);
+        p.cubicTo (5.73818f, 3.9531f, 6.26501f, 3.66111f, 6.83973f, 3.6149f);
+        p.cubicTo (7.49907f, 3.5619f, 8.29805f, 4.06126f, 9.896f, 5.05998f);
+        p.lineTo (16.6582f, 9.28638f);
+        p.closeSubPath();
+
+        juce::PathStrokeType stroke (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+        juce::Path strokedPath;
+        stroke.createStrokedPath (strokedPath, p);
+        return strokedPath;
+    }
+
+    static juce::Path getStopPath()
+    {
+        juce::Path p;
+        p.startNewSubPath (2.0f, 12.0f);
+        p.cubicTo (2.0f, 7.28595f, 2.0f, 4.92893f, 3.46447f, 3.46447f);
+        p.cubicTo (4.92893f, 2.0f, 7.28595f, 2.0f, 12.0f, 2.0f);
+        p.cubicTo (16.714f, 2.0f, 19.0711f, 2.0f, 20.5355f, 3.46447f);
+        p.cubicTo (22.0f, 4.92893f, 22.0f, 7.28595f, 22.0f, 12.0f);
+        p.cubicTo (22.0f, 16.714f, 22.0f, 19.0711f, 20.5355f, 20.5355f);
+        p.cubicTo (19.0711f, 22.0f, 16.714f, 22.0f, 12.0f, 22.0f);
+        p.cubicTo (7.28595f, 22.0f, 4.92893f, 22.0f, 3.46447f, 20.5355f);
+        p.cubicTo (2.0f, 19.0711f, 2.0f, 16.714f, 2.0f, 12.0f);
+        p.closeSubPath();
+
+        juce::PathStrokeType stroke (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+        juce::Path strokedPath;
+        stroke.createStrokedPath (strokedPath, p);
+        return strokedPath;
+    }
+
+    static juce::Path getResetPath()
+    {
+        juce::Path p;
+        p.startNewSubPath (18.2577f, 3.50828f);
+        p.cubicTo (18.538f, 3.62437f, 18.7207f, 3.89785f, 18.7207f, 4.20119f);
+        p.lineTo (18.7207f, 8.44383f);
+        p.cubicTo (18.7207f, 8.85805f, 18.3849f, 9.19383f, 17.9707f, 9.19383f);
+        p.lineTo (13.728f, 9.19383f);
+        p.cubicTo (13.4247f, 9.19383f, 13.1512f, 9.0111f, 13.0351f, 8.73085f);
+        p.cubicTo (12.9191f, 8.45059f, 12.9832f, 8.128f, 13.1977f, 7.9135f);
+        p.lineTo (14.8007f, 6.3105f);
+        p.cubicTo (12.1674f, 5.20912f, 9.01606f, 5.7309f, 6.87348f, 7.87348f);
+        p.cubicTo (4.04217f, 10.7048f, 4.04217f, 15.2952f, 6.87348f, 18.1265f);
+        p.cubicTo (9.70478f, 20.9578f, 14.2952f, 20.9578f, 17.1265f, 18.1265f);
+        p.cubicTo (18.7727f, 16.4803f, 19.4622f, 14.2401f, 19.1935f, 12.0937f);
+        p.cubicTo (19.142f, 11.6827f, 19.4335f, 11.3078f, 19.8445f, 11.2563f);
+        p.cubicTo (20.2555f, 11.2049f, 20.6304f, 11.4963f, 20.6819f, 11.9073f);
+        p.cubicTo (21.0057f, 14.4934f, 20.1746f, 17.1997f, 18.1872f, 19.1872f);
+        p.cubicTo (14.7701f, 22.6043f, 9.2299f, 22.6043f, 5.81282f, 19.1872f);
+        p.cubicTo (2.39573f, 15.7701f, 2.39573f, 10.2299f, 5.81282f, 6.81282f);
+        p.cubicTo (8.55119f, 4.07444f, 12.6515f, 3.5312f, 15.9309f, 5.18028f);
+        p.lineTo (17.4404f, 3.67086f);
+        p.cubicTo (17.6549f, 3.45637f, 17.9774f, 3.3922f, 18.2577f, 3.50828f);
+        p.closeSubPath();
+        return p;
+    }
+
     // =========================================================================
     // Buscador Genérico por Nombre de Icono
     // =========================================================================
@@ -150,6 +221,9 @@ public:
         if (name.equalsIgnoreCase ("arrow_left"))  return getBackArrowPath();
         if (name.equalsIgnoreCase ("trash"))       return getTrashPath();
         if (name.equalsIgnoreCase ("settings"))    return getSettingsPath();
+        if (name.equalsIgnoreCase ("play"))        return getPlayPath();
+        if (name.equalsIgnoreCase ("stop"))        return getStopPath();
+        if (name.equalsIgnoreCase ("reset"))       return getResetPath();
         
         return juce::Path();
     }

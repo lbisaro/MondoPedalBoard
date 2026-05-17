@@ -1,7 +1,9 @@
 #pragma once
 #include <JuceHeader.h>
 #include "AnalysisEngine.h"
+#include "GuitarEmulator.h"
 #include "AppSettings.h"
+#include "PinkNoiseGenerator.h"
 
 class MondoHelixAnalyzerAudioProcessor : public juce::AudioProcessor
 {
@@ -34,6 +36,14 @@ public:
 
     AnalysisEngine analyzer;
     AppSettings settings;
+    PinkNoiseGenerator pinkNoiseGen;
+    GuitarStringSynth guitarSynth;
+    CalibrationSequencer emulatorSequencer;
+    
+    std::atomic<bool> useInternalNoise { false };
+    std::atomic<bool> useEmulator { false };
+    std::atomic<bool> useLiveGuitar { false };
+    std::atomic<bool> isShuttingDown { false };
 
     // =========================================================================
     // Sistema de Grabación de DI en RAM
@@ -46,7 +56,37 @@ public:
     void stopDIRecording();
     bool saveRecordedDI (const juce::String& fileName);
 
+    // =========================================================================
+    // Sistema de Reproducción de DI en Loop
+    // =========================================================================
+    void loadDIForPlayback(const juce::File& file);
+    void playDI();
+    void stopDI();
+    void setEmulatorActive(bool active);
+    bool isEmulatorActive() const { return useEmulator.load(); }
+    void setLiveGuitarActive(bool active) { useLiveGuitar.store(active); }
+    bool isLiveGuitarActive() const { return useLiveGuitar.load(); }
+    bool isDIPlaying() const;
+    
+    float getDIPlaybackProgress() const
+    {
+        if (! isPlayingDI.load() || diPlaybackBuffer.getNumSamples() <= 0)
+            return 0.0f;
+        return static_cast<float>(diPlaybackPosition.load()) / static_cast<float>(diPlaybackBuffer.getNumSamples());
+    }
+
+    double getDITotalDurationSeconds() const
+    {
+        if (diPlaybackBuffer.getNumSamples() <= 0 || currentSampleRate <= 0.0)
+            return 0.0;
+        return static_cast<double>(diPlaybackBuffer.getNumSamples()) / currentSampleRate;
+    }
+
 private:
+    juce::AudioBuffer<float> diPlaybackBuffer;
+    std::atomic<int> diPlaybackPosition { 0 };
+    std::atomic<bool> isPlayingDI { false };
+
     juce::AudioBuffer<float> diRecordBuffer;
     std::atomic<int> diRecordSampleCount { 0 };
     double currentSampleRate = 44100.0;

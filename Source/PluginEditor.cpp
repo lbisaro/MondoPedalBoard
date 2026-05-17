@@ -9,16 +9,17 @@ MondoHelixAnalyzerAudioProcessorEditor::MondoHelixAnalyzerAudioProcessorEditor (
 {
     setLookAndFeel (&customLookAndFeel);
 
-    // Tamaño base optimizado para alojar las tarjetas con elegancia
-    setSize (750, 500);
+    // Tamaño base optimizado (750x500) incrementado un 25% por defecto si no hay guardado
+    setSize (audioProcessor.settings.windowWidth, audioProcessor.settings.windowHeight);
     setResizable (true, true);
-    setResizeLimits (600, 400, 3840, 2160);
+    setResizeLimits (750, 500, 3840, 2160);
 
     // Inicializar submódulos
     homeView = std::make_unique<HomeViewComponent>();
     diListView = std::make_unique<GuitarDIListViewComponent>(audioProcessor.settings);
     diRecorderView = std::make_unique<GuitarDIRecorderViewComponent>(audioProcessor);
     analyzerView = std::make_unique<PresetAnalyzerViewComponent>(audioProcessor);
+    samplesAnalyzerView = std::make_unique<SamplesAnalyzerViewComponent>(audioProcessor.settings);
     settingsPanel = std::make_unique<SettingsComponent>(audioProcessor.settings);
 
     // Configurar enrutamiento (Routing)
@@ -30,6 +31,7 @@ MondoHelixAnalyzerAudioProcessorEditor::MondoHelixAnalyzerAudioProcessorEditor (
         }
         else if (moduleIndex == 1)
         {
+            analyzerView->refreshDIList();
             showView (analyzerView.get(), "Preset Analyzer");
         }
         else if (moduleIndex == 2)
@@ -39,6 +41,11 @@ MondoHelixAnalyzerAudioProcessorEditor::MondoHelixAnalyzerAudioProcessorEditor (
                 "Modulo en Desarrollo",
                 "El modulo 'Preset Comparer' estara disponible en la proxima actualizacion de la suite."
             );
+        }
+        else if (moduleIndex == 3)
+        {
+            samplesAnalyzerView->refreshFilesList();
+            showView (samplesAnalyzerView.get(), "Samples Analyzer");
         }
     };
 
@@ -82,13 +89,43 @@ MondoHelixAnalyzerAudioProcessorEditor::MondoHelixAnalyzerAudioProcessorEditor (
 
 MondoHelixAnalyzerAudioProcessorEditor::~MondoHelixAnalyzerAudioProcessorEditor()
 {
+    // Guardar estado de la ventana antes de cerrar
+    audioProcessor.settings.windowWidth = getWidth();
+    audioProcessor.settings.windowHeight = getHeight();
+    
+    if (auto* window = getTopLevelComponent())
+    {
+        auto pos = window->getScreenPosition();
+        audioProcessor.settings.windowX = pos.getX();
+        audioProcessor.settings.windowY = pos.getY();
+    }
+    
+    audioProcessor.settings.saveSettings();
     setLookAndFeel (nullptr);
+}
+
+void MondoHelixAnalyzerAudioProcessorEditor::parentHierarchyChanged()
+{
+    if (auto* window = getTopLevelComponent())
+    {
+        if (audioProcessor.settings.windowX != -1)
+        {
+            window->setTopLeftPosition (audioProcessor.settings.windowX, audioProcessor.settings.windowY);
+        }
+    }
 }
 
 void MondoHelixAnalyzerAudioProcessorEditor::showView (juce::Component* newView, const juce::String& moduleTitle)
 {
     if (currentView != nullptr)
+    {
+        // Si el usuario está abandonando el módulo del Analizador, detenemos automáticamente
+        // la reproducción del loop DI para ahorrar ciclos de CPU en el motor DSP.
+        if (currentView == analyzerView.get() && newView != analyzerView.get())
+            audioProcessor.stopDI();
+
         removeChildComponent (currentView);
+    }
 
     currentView = newView;
     currentModuleTitle = moduleTitle;

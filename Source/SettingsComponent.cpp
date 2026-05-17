@@ -11,6 +11,18 @@ SettingsComponent::SettingsComponent(AppSettings& s) : settings(s)
     playOutCombo.onChange = [this] { settings.playbackOutputChannel.store(playOutCombo.getSelectedId()); settings.saveSettings(); };
     diInCombo.onChange = [this] { settings.diInputChannel.store(diInCombo.getSelectedId()); settings.saveSettings(); };
 
+    addAndMakeVisible(smoothingLabel);
+    smoothingLabel.setText("FFT Smoothing (Octave):", juce::dontSendNotification);
+    addAndMakeVisible(smoothingCombo);
+    smoothingCombo.addItem("1/3 Octave", 3);
+    smoothingCombo.addItem("1/6 Octave", 6);
+    smoothingCombo.addItem("1/12 Octave", 12);
+    smoothingCombo.setSelectedId(settings.fftSmoothingDenominator.load(), juce::dontSendNotification);
+    smoothingCombo.onChange = [this] { 
+        settings.fftSmoothingDenominator.store(smoothingCombo.getSelectedId()); 
+        settings.saveSettings(); 
+    };
+
     addAndMakeVisible(folderLabel);
     folderLabel.setText("Data Folder:", juce::dontSendNotification);
     
@@ -76,7 +88,13 @@ void SettingsComponent::resized()
     diInLabel.setBounds(row3.removeFromLeft(240));
     diInCombo.setBounds(row3.reduced(0, 3));
 
-    bounds.removeFromTop(30);
+    bounds.removeFromTop(15);
+
+    auto rowSmooth = bounds.removeFromTop(35);
+    smoothingLabel.setBounds(rowSmooth.removeFromLeft(240));
+    smoothingCombo.setBounds(rowSmooth.reduced(0, 3));
+
+    bounds.removeFromTop(20);
 
     auto row4 = bounds.removeFromTop(35);
     folderLabel.setBounds(row4.removeFromLeft(120));

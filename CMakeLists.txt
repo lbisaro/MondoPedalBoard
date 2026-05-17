@@ -66,6 +66,9 @@ target_sources(MondoHelixAnalyzer PRIVATE
     Source/GuitarDIListViewComponent.h
     Source/GuitarDIRecorderViewComponent.cpp
     Source/GuitarDIRecorderViewComponent.h
+    Source/SamplesAnalyzerViewComponent.cpp
+    Source/SamplesAnalyzerViewComponent.h
+    Source/SamplesOfflineAnalyzer.h
 )
 
 # (Se eliminó la opción PCH temporalmente por problemas de parseo en CMake/MSVC)
