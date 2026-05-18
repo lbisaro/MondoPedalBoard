@@ -18,6 +18,9 @@ public:
     void mouseMove (const juce::MouseEvent& e) override;
     void mouseExit  (const juce::MouseEvent& e) override;
 
+    struct TargetRange { float minFreq, maxFreq; juce::String name; juce::Colour color; };
+    void setTargetRanges (const std::vector<TargetRange>& ranges);
+
     void updateCurve();    // Llamado desde el timer de la vista
 
 private:
@@ -25,6 +28,8 @@ private:
 
     std::array<float, BlockAnalyzer::numBins> magnitudeData {};
     std::array<float, BlockAnalyzer::numBins> smoothedData  {};
+
+    std::vector<TargetRange> targetRanges;
 
     // Escala fija: -16 dB a +16 dB (pedida por el usuario)
     static constexpr float kMinDb = -16.0f;
@@ -56,6 +61,9 @@ private:
     void startSweep();
     void stopSweep();
 
+    // Actualiza las bandas verticales de referencia (BODY, CUT, BRIGHTNESS)
+    void updateTargetBands();
+
     MondoHelixAnalyzerAudioProcessor& audioProcessor;
 
     // Unique component -- single EQ magnitude graph
@@ -65,8 +73,10 @@ private:
     juce::Label titleLabel;
     juce::Label statusLabel;    // cycle count, right-aligned
 
-    // Header row 2: routing info (full width)
-    juce::Label routingLabel;
+    // Header row 2: routing info (left) + target selector (right)
+    juce::Label    routingLabel;
+    juce::Label    targetLabel;
+    juce::ComboBox targetComboBox;
 
     int measurementCycle = 0;
 

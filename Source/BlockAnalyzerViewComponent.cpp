@@ -1,6 +1,7 @@
 #include "BlockAnalyzerViewComponent.h"
 #include "IconLibrary.h"
 #include "CustomLookAndFeel.h"
+#include "TargetProfiles.h"
 
 // =============================================================================
 // EQTransferFunctionGraph
@@ -23,6 +24,12 @@ void EQTransferFunctionGraph::updateCurve()
     for (int i = 0; i < BlockAnalyzer::numBins; ++i)
         smoothedData[i] = uiEma * smoothedData[i] + (1.0f - uiEma) * magnitudeData[i];
 
+    repaint();
+}
+
+void EQTransferFunctionGraph::setTargetRanges (const std::vector<TargetRange>& ranges)
+{
+    targetRanges = ranges;
     repaint();
 }
 
@@ -74,6 +81,27 @@ void EQTransferFunctionGraph::paint (juce::Graphics& g)
     {
         return bottom - height * juce::jmap (db, kMinDb, kMaxDb, 0.0f, 1.0f);
     };
+
+    // --- Draw Target Bands (Background) ---
+    for (const auto& range : targetRanges)
+    {
+        float x1 = freqToX (juce::jlimit (20.0f, 20000.0f, range.minFreq));
+        float x2 = freqToX (juce::jlimit (20.0f, 20000.0f, range.maxFreq));
+
+        juce::Rectangle<float> bandRect (x1, top, x2 - x1, height);
+
+        g.setColour (range.color.withAlpha (0.06f));
+        g.fillRect (bandRect);
+
+        g.setColour (range.color.withAlpha (0.15f));
+        g.drawVerticalLine (juce::roundToInt (x1), top, bottom);
+        g.drawVerticalLine (juce::roundToInt (x2), top, bottom);
+
+        g.setColour (range.color.withAlpha (0.4f));
+        g.setFont (juce::Font (9.0f, juce::Font::bold));
+        g.drawText (range.name, juce::roundToInt (x1), juce::roundToInt (top) + 2, juce::roundToInt (x2 - x1), 15,
+                    juce::Justification::centredTop, false);
+    }
 
     // --- Frequency grid (vertical lines) ---
     const float freqMarks[] = { 20.f, 50.f, 100.f, 200.f, 500.f,
@@ -270,11 +298,28 @@ BlockAnalyzerViewComponent::BlockAnalyzerViewComponent (MondoHelixAnalyzerAudioP
     statusLabel.setText ("Initializing...", juce::dontSendNotification);
     addAndMakeVisible (statusLabel);
 
-    // --- Routing info (row 2, full width) ---
+    // --- Routing info (row 2, left part) ---
     routingLabel.setFont (juce::Font (10.0f));
-    routingLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.3f));
+    routingLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.4f));
     routingLabel.setJustificationType (juce::Justification::centredLeft);
     addAndMakeVisible (routingLabel);
+
+    // --- Target selector label (row 2) ---
+    targetLabel.setText ("TARGET PROFILE:", juce::dontSendNotification);
+    targetLabel.setFont (juce::Font (9.0f, juce::Font::bold));
+    targetLabel.setColour (juce::Label::textColourId, juce::Colours::white.withAlpha (0.4f));
+    targetLabel.setJustificationType (juce::Justification::centredRight);
+    addAndMakeVisible (targetLabel);
+
+    // --- Target selector ComboBox (row 2) ---
+    addAndMakeVisible (targetComboBox);
+    targetComboBox.addItem ("AMBIENT", 1);
+    targetComboBox.addItem ("RHYTHM", 2);
+    targetComboBox.addItem ("LEAD", 3);
+    targetComboBox.setSelectedId (2, juce::dontSendNotification); // Default: Rhythm
+    targetComboBox.onChange = [this] { updateTargetBands(); };
+
+    updateTargetBands();
 
     startTimerHz (30);
 }
@@ -300,6 +345,7 @@ void BlockAnalyzerViewComponent::startSweep()
     audioProcessor.setEmulatorActive     (false);
     audioProcessor.useInternalNoise.store  (false);
     audioProcessor.useModulatedNoise.store (false);
+    audioProcessor.useBlockAnalyzerSweep.store (true);
     audioProcessor.playDI();
 
     measurementCycle = 0;
@@ -308,6 +354,7 @@ void BlockAnalyzerViewComponent::startSweep()
 
 void BlockAnalyzerViewComponent::stopSweep()
 {
+    audioProcessor.useBlockAnalyzerSweep.store (false);
     audioProcessor.stopDI();
     statusLabel.setText ("Stopped", juce::dontSendNotification);
 }
@@ -326,15 +373,59 @@ void BlockAnalyzerViewComponent::resized()
     titleLabel.setBounds  (row1.removeFromLeft (row1.getWidth() * 7 / 10));
     statusLabel.setBounds (row1);
 
-    bounds.removeFromTop (2);
+    bounds.removeFromTop (4);
 
-    // Row 2: routing info
-    auto row2 = bounds.removeFromTop (18);
-    routingLabel.setBounds (row2);
+    // Row 2: routing info (left 65%) + target selector (right 35%)
+    auto row2 = bounds.removeFromTop (22);
+    routingLabel.setBounds (row2.removeFromLeft (row2.getWidth() * 65 / 100));
 
-    bounds.removeFromTop (6);
+    // Remainder is for TARGET PROFILE selector
+    int remWidth = row2.getWidth();
+    targetLabel.setBounds (row2.removeFromLeft (remWidth * 38 / 100));
+    targetComboBox.setBounds (row2);
+
+    bounds.removeFromTop (8);
 
     eqGraph.setBounds (bounds);
+}
+
+void BlockAnalyzerViewComponent::updateTargetBands()
+{
+    std::vector<EQTransferFunctionGraph::TargetRange> ranges;
+
+    // 1. BODY band (100 Hz to 500 Hz, purple)
+    ranges.push_back ({ 100.0f, 500.0f, "BODY", juce::Colours::mediumpurple });
+
+    // 2. CUT band (2000 Hz to 5000 Hz, emerald green)
+    ranges.push_back ({ 2000.0f, 5000.0f, "CUT", juce::Colours::mediumspringgreen });
+
+    // 3. BRIGHTNESS band (determined by target selection)
+    int targetId = targetComboBox.getSelectedId();
+    float bMin = 0.0f;
+    float bMax = 0.0f;
+
+    if (targetId == 1) // AMBIENT
+    {
+        bMin = TargetProfiles::AMBIENT_BRILLO_MIN;
+        bMax = TargetProfiles::AMBIENT_BRILLO_MAX;
+    }
+    else if (targetId == 2) // RHYTHM
+    {
+        bMin = TargetProfiles::RHYTHM_BRILLO_MIN;
+        bMax = TargetProfiles::RHYTHM_BRILLO_MAX;
+    }
+    else if (targetId == 3) // LEAD
+    {
+        bMin = TargetProfiles::LEAD_BRILLO_MIN;
+        bMax = TargetProfiles::LEAD_BRILLO_MAX;
+    }
+
+    if (bMax > 0.0f)
+    {
+        ranges.push_back ({ bMin, bMax, "BRIGHTNESS", juce::Colours::orange });
+    }
+
+    eqGraph.setTargetRanges (ranges);
 }
 
 void BlockAnalyzerViewComponent::timerCallback()

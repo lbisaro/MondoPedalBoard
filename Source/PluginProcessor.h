@@ -48,6 +48,7 @@ public:
     std::atomic<bool> useModulatedNoise { false };
     std::atomic<bool> useEmulator { false };
     std::atomic<bool> useLiveGuitar { false };
+    std::atomic<bool> useBlockAnalyzerSweep { false };
     std::atomic<bool> isShuttingDown { false };
 
     // =========================================================================

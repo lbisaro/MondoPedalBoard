@@ -265,7 +265,7 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
     // 4. ESS Block Analyzer:
     //    - Inject sweep samples into the Helix output channel
     //    - Capture the Helix return (procIdx) sample-by-sample in the engine
-    if (isPlayingDI.load() && outIdx >= 0 && outIdx < totalNumOutputChannels)
+    if (isPlayingDI.load() && useBlockAnalyzerSweep.load() && outIdx >= 0 && outIdx < totalNumOutputChannels)
     {
         const int numSamples = buffer.getNumSamples();
         auto* outL   = buffer.getWritePointer (outIdx);
@@ -283,7 +283,7 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
             blockAnalyzer.captureSample (procPtr[i]);
         }
     }
-    else if (! isPlayingDI.load())
+    else if (! useBlockAnalyzerSweep.load())
     {
         blockAnalyzer.decay();
     }
