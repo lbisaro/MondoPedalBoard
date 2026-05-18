@@ -5,7 +5,10 @@
 #include "AppSettings.h"
 #include "PinkNoiseGenerator.h"
 
-class MondoHelixAnalyzerAudioProcessor : public juce::AudioProcessor
+#include "BlockAnalyzer.h"
+
+class MondoHelixAnalyzerAudioProcessor : public juce::AudioProcessor,
+                                         private juce::Timer
 {
 public:
     MondoHelixAnalyzerAudioProcessor();
@@ -39,8 +42,10 @@ public:
     PinkNoiseGenerator pinkNoiseGen;
     GuitarStringSynth guitarSynth;
     CalibrationSequencer emulatorSequencer;
+    BlockAnalyzer blockAnalyzer;
     
     std::atomic<bool> useInternalNoise { false };
+    std::atomic<bool> useModulatedNoise { false };
     std::atomic<bool> useEmulator { false };
     std::atomic<bool> useLiveGuitar { false };
     std::atomic<bool> isShuttingDown { false };
@@ -89,7 +94,21 @@ private:
 
     juce::AudioBuffer<float> diRecordBuffer;
     std::atomic<int> diRecordSampleCount { 0 };
+    juce::AudioBuffer<float> blockAnalyzerInputBackup;
     double currentSampleRate = 44100.0;
+    double sweepPhase = 0.0;
+
+    // =========================================================================
+    // Watchdog de la Helix (Evita cuelgues de Windows por desconexión de ASIO)
+    // =========================================================================
+    enum class HelixState { Connected, Disconnected };
+    HelixState lastHelixState = HelixState::Connected;
+    bool wasUsingHelix = false;
+
+    bool isHelixHardwareConnected();
+    void handleHelixDisconnection();
+    void handleHelixReconnection();
+    void timerCallback() override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MondoHelixAnalyzerAudioProcessor)
 };

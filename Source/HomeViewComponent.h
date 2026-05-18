@@ -39,7 +39,7 @@ public:
 private:
     std::unique_ptr<ModuleCardComponent> guitarDICard;
     std::unique_ptr<ModuleCardComponent> presetAnalyzerCard;
-    std::unique_ptr<ModuleCardComponent> presetComparerCard;
+    std::unique_ptr<ModuleCardComponent> blockAnalyzerCard;
     std::unique_ptr<ModuleCardComponent> samplesAnalyzerCard;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HomeViewComponent)

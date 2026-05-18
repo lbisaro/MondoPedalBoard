@@ -5,6 +5,13 @@
  #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 #endif
 
+#if JUCE_WINDOWS
+ #include <windows.h>
+ #include <setupapi.h>
+ #include <devguid.h>
+ #pragma comment(lib, "setupapi.lib")
+#endif
+
 
 MondoHelixAnalyzerAudioProcessor::MondoHelixAnalyzerAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -15,10 +22,13 @@ MondoHelixAnalyzerAudioProcessor::MondoHelixAnalyzerAudioProcessor()
        emulatorSequencer(guitarSynth)
 #endif
 {
+    startTimer (200);
 }
 
 MondoHelixAnalyzerAudioProcessor::~MondoHelixAnalyzerAudioProcessor()
 {
+    stopTimer();
+    
     // Indicar al host que deje de llamar al processBlock inmediatamente
     suspendProcessing (true);
     
@@ -72,6 +82,7 @@ void MondoHelixAnalyzerAudioProcessor::prepareToPlay (double sampleRate, int sam
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
     analyzer.prepare(currentSampleRate);
     guitarSynth.prepare(currentSampleRate);
+    blockAnalyzer.prepare(currentSampleRate);
     
     juce::dsp::ProcessSpec spec;
     spec.sampleRate = currentSampleRate;
@@ -83,6 +94,10 @@ void MondoHelixAnalyzerAudioProcessor::prepareToPlay (double sampleRate, int sam
     diRecordBuffer.setSize (1, static_cast<int>(currentSampleRate * 60.0 * 5.0));
     diRecordBuffer.clear();
     diRecordSampleCount.store (0);
+    
+    // Asignar búfer temporal para la copia limpia de la señal procesada del BlockAnalyzer
+    blockAnalyzerInputBackup.setSize (1, samplesPerBlock);
+    blockAnalyzerInputBackup.clear();
 }
 
 void MondoHelixAnalyzerAudioProcessor::releaseResources()
@@ -93,6 +108,7 @@ void MondoHelixAnalyzerAudioProcessor::releaseResources()
     stopDI();
     stopDIRecording();
     analyzer.resetMetrics();
+    blockAnalyzer.reset();
 }
 
 bool MondoHelixAnalyzerAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -119,6 +135,20 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
     int procIdx = settings.processedInputChannel.load() - 1; // 1-based to 0-based index
     int diIdx = settings.diInputChannel.load() - 1;
     int outIdx = settings.playbackOutputChannel.load() - 1;
+
+    // Respaldar la señal de retorno procesada (procIdx) de la Helix antes de que sea borrada por el flujo de salida
+    if (procIdx >= 0 && procIdx < totalNumInputChannels)
+    {
+        // Redimensionar por seguridad si el tamaño de bloque difiere dinámicamente
+        if (blockAnalyzerInputBackup.getNumSamples() != buffer.getNumSamples())
+            blockAnalyzerInputBackup.setSize (1, buffer.getNumSamples(), false, false, true);
+
+        blockAnalyzerInputBackup.copyFrom (0, 0, buffer, procIdx, 0, buffer.getNumSamples());
+    }
+    else
+    {
+        blockAnalyzerInputBackup.clear();
+    }
 
     // 1. Procesamiento de la señal DI de entrada (Lectura pura sin alterar el buffer)
     float maxDI = 0.0f;
@@ -161,25 +191,13 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
     if (isPlayingDI.load())
     {
         // Limpiamos los canales de salida para evitar que audio residual de otros procesos interfiera.
-        // Pero reservamos los canales de monitoreo para pasar el retorno de la Helix.
         for (auto i = 0; i < totalNumOutputChannels; ++i)
             buffer.clear (i, 0, buffer.getNumSamples());
 
-        // A. Inyección de señal (DI o Ruido Rosa) hacia la Helix
+        // A. Inyección de señal hacia la Helix
         if (useLiveGuitar.load())
         {
-            // Guitarra en vivo: No inyectamos señal a la salida hacia la Helix.
-            // La Helix procesa su entrada física "Guitar" directamente,
-            // mientras la app analiza en tiempo real y gestiona el transporte.
-        }
-        else if (useInternalNoise.load())
-        {
-            if (outIdx >= 0 && outIdx < totalNumOutputChannels)
-            {
-                int targetChs = ((outIdx + 1) < totalNumOutputChannels) ? 2 : 1;
-                juce::AudioBuffer<float> subBuffer (buffer.getArrayOfWritePointers() + outIdx, targetChs, buffer.getNumSamples());
-                pinkNoiseGen.processBlock (subBuffer);
-            }
+            // Guitarra en vivo: señal física, sin inyección artificial.
         }
         else if (useEmulator.load())
         {
@@ -242,6 +260,32 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
         // Silencio absoluto si no hay transporte activo
         for (auto i = 0; i < totalNumOutputChannels; ++i)
             buffer.clear (i, 0, buffer.getNumSamples());
+    }
+
+    // 4. ESS Block Analyzer:
+    //    - Inject sweep samples into the Helix output channel
+    //    - Capture the Helix return (procIdx) sample-by-sample in the engine
+    if (isPlayingDI.load() && outIdx >= 0 && outIdx < totalNumOutputChannels)
+    {
+        const int numSamples = buffer.getNumSamples();
+        auto* outL   = buffer.getWritePointer (outIdx);
+        auto* outR   = ((outIdx + 1) < totalNumOutputChannels) ? buffer.getWritePointer (outIdx + 1) : nullptr;
+        const auto* procPtr = blockAnalyzerInputBackup.getReadPointer (0);
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            // Get the next sweep sample and write it to the Helix output
+            float sweepSample = blockAnalyzer.getNextSweepSample();
+            outL[i] = sweepSample;
+            if (outR != nullptr) outR[i] = sweepSample;
+
+            // Feed the Helix return sample into the capture engine (aligned to sweep)
+            blockAnalyzer.captureSample (procPtr[i]);
+        }
+    }
+    else if (! isPlayingDI.load())
+    {
+        blockAnalyzer.decay();
     }
 }
 
@@ -352,11 +396,11 @@ void MondoHelixAnalyzerAudioProcessor::loadDIForPlayback(const juce::File& file)
 
 void MondoHelixAnalyzerAudioProcessor::playDI()
 {
-    diPlaybackPosition.store(0);
+    diPlaybackPosition.store (0);
     if (useEmulator.load())
         emulatorSequencer.start();
         
-    isPlayingDI.store(true);
+    isPlayingDI.store (true);
 }
 
 void MondoHelixAnalyzerAudioProcessor::stopDI()
@@ -374,5 +418,229 @@ void MondoHelixAnalyzerAudioProcessor::setEmulatorActive(bool active)
 bool MondoHelixAnalyzerAudioProcessor::isDIPlaying() const
 {
     return isPlayingDI.load();
+}
+
+// =============================================================================
+// Watchdog de la Helix (Evita cuelgues de Windows por desconexión de ASIO)
+// =============================================================================
+
+bool MondoHelixAnalyzerAudioProcessor::isHelixHardwareConnected()
+{
+#if JUCE_WINDOWS
+    // 1. Direct hardware enumeration using Windows SetupAPI
+    bool foundInSetupAPI = false;
+    HDEVINFO hDevInfo = SetupDiGetClassDevs(NULL, NULL, NULL, DIGCF_ALLCLASSES | DIGCF_PRESENT);
+    if (hDevInfo != INVALID_HANDLE_VALUE)
+    {
+        SP_DEVINFO_DATA deviceInfoData;
+        deviceInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
+
+        for (DWORD i = 0; SetupDiEnumDeviceInfo(hDevInfo, i, &deviceInfoData); i++)
+        {
+            char buffer[512];
+            DWORD dataType;
+            DWORD actualSize = 0;
+            
+            // Query Device Description
+            if (SetupDiGetDeviceRegistryPropertyA(hDevInfo, &deviceInfoData, SPDRP_DEVICEDESC, 
+                                                   &dataType, (BYTE*)buffer, sizeof(buffer), &actualSize))
+            {
+                juce::String desc(buffer);
+                if (desc.containsIgnoreCase("Helix") || desc.containsIgnoreCase("Line 6") || desc.containsIgnoreCase("Line6"))
+                {
+                    foundInSetupAPI = true;
+                    break;
+                }
+            }
+
+            // Query Friendly Name
+            if (SetupDiGetDeviceRegistryPropertyA(hDevInfo, &deviceInfoData, SPDRP_FRIENDLYNAME, 
+                                                   &dataType, (BYTE*)buffer, sizeof(buffer), &actualSize))
+            {
+                juce::String friendly(buffer);
+                if (friendly.containsIgnoreCase("Helix") || friendly.containsIgnoreCase("Line 6") || friendly.containsIgnoreCase("Line6"))
+                {
+                    foundInSetupAPI = true;
+                    break;
+                }
+            }
+        }
+        SetupDiDestroyDeviceInfoList(hDevInfo);
+    }
+
+    if (foundInSetupAPI)
+        return true;
+
+    // 2. Fallback check: Midi Input Devices
+    for (auto& info : juce::MidiInput::getAvailableDevices())
+    {
+        if (info.name.containsIgnoreCase("Helix") || info.name.containsIgnoreCase("Line 6") || info.name.containsIgnoreCase("Line6"))
+            return true;
+    }
+
+    // 3. Fallback check: Midi Output Devices
+    for (auto& info : juce::MidiOutput::getAvailableDevices())
+    {
+        if (info.name.containsIgnoreCase("Helix") || info.name.containsIgnoreCase("Line 6") || info.name.containsIgnoreCase("Line6"))
+            return true;
+    }
+
+    return false;
+#else
+    return true; // Graceful on other systems
+#endif
+}
+
+void MondoHelixAnalyzerAudioProcessor::handleHelixDisconnection()
+{
+    // Suspend audio processing to prevent the audio thread from calling empty/crashed callbacks
+    suspendProcessing(true);
+    
+    // Stop DI playback and recorders
+    stopDI();
+    stopDIRecording();
+
+#if defined(JucePlugin_Build_Standalone) && JucePlugin_Build_Standalone
+    // Safe closing of the audio device immediately, before the driver thread freezes the system
+    if (auto* holder = juce::StandalonePluginHolder::getInstance())
+    {
+        holder->stopPlaying();
+        holder->deviceManager.closeAudioDevice();
+    }
+#endif
+
+    // Log to console for debugging
+    DBG("Helix Watchdog: Helix disconnected! Audio device closed safely.");
+
+    // Warn the user with an asynchronous message box so it does not block the thread
+    juce::MessageManager::callAsync([]()
+    {
+        juce::AlertWindow::showMessageBoxAsync (
+            juce::AlertWindow::WarningIcon,
+            "Helix Desconectada",
+            "Se ha detectado la desconexion o apagado de la Line 6 Helix.\n\n"
+            "El dispositivo de audio se ha cerrado de forma segura para evitar un cuelgue del sistema (tildado o BSOD de Windows).\n\n"
+            "La aplicacion intentara reconectarse automaticamente en cuanto vuelvas a encender o conectar la Helix por USB.",
+            "Entendido"
+        );
+    });
+}
+
+void MondoHelixAnalyzerAudioProcessor::handleHelixReconnection()
+{
+    DBG("Helix Watchdog: Helix reconnected! Attempting auto-reconnection...");
+
+    // Wait a brief moment to let the Windows PnP service and drivers initialize fully
+    juce::Thread::sleep(2000);
+
+#if defined(JucePlugin_Build_Standalone) && JucePlugin_Build_Standalone
+    if (auto* holder = juce::StandalonePluginHolder::getInstance())
+    {
+        juce::String helixDeviceName;
+        juce::AudioIODeviceType* targetType = nullptr;
+
+        // Scan all device types for the Helix
+        for (auto* type : holder->deviceManager.getAvailableDeviceTypes())
+        {
+            type->scanForDevices();
+            auto devices = type->getDeviceNames();
+            for (auto& d : devices)
+            {
+                if (d.containsIgnoreCase("Helix") || d.containsIgnoreCase("Line 6") || d.containsIgnoreCase("Line6"))
+                {
+                    helixDeviceName = d;
+                    targetType = type;
+                    break;
+                }
+            }
+            if (targetType != nullptr)
+                break;
+        }
+
+        if (targetType != nullptr && helixDeviceName.isNotEmpty())
+        {
+            // Change the type first if necessary
+            holder->deviceManager.setCurrentAudioDeviceType(targetType->getTypeName(), true);
+
+            // Re-apply setup
+            juce::AudioDeviceManager::AudioDeviceSetup setup;
+            holder->deviceManager.getAudioDeviceSetup(setup);
+            setup.inputDeviceName = helixDeviceName;
+            setup.outputDeviceName = helixDeviceName;
+            setup.useDefaultInputChannels = true;
+            setup.useDefaultOutputChannels = true;
+            
+            juce::String error = holder->deviceManager.setAudioDeviceSetup(setup, true);
+            if (error.isEmpty())
+            {
+                holder->startPlaying();
+                suspendProcessing(false);
+
+                DBG("Helix Watchdog: Reconnection successful!");
+
+                juce::MessageManager::callAsync([]()
+                {
+                    juce::AlertWindow::showMessageBoxAsync (
+                        juce::AlertWindow::InfoIcon,
+                        "Helix Reconectada",
+                        "¡Se ha detectado y reactivado la Line 6 Helix con exito!\n\n"
+                        "El motor de audio ha sido restaurado y las entradas/salidas estan listas.",
+                        "¡Genial!"
+                    );
+                });
+                return;
+            }
+            else
+            {
+                DBG("Helix Watchdog: Reconnection failed with error: " + error);
+            }
+        }
+    }
+#endif
+
+    // If we failed to reconnect, set state back to Disconnected so we will retry next tick
+    lastHelixState = HelixState::Disconnected;
+}
+
+void MondoHelixAnalyzerAudioProcessor::timerCallback()
+{
+    if (isShuttingDown.load())
+        return;
+
+#if defined(JucePlugin_Build_Standalone) && JucePlugin_Build_Standalone
+    if (auto* holder = juce::StandalonePluginHolder::getInstance())
+    {
+        auto* currentDevice = holder->deviceManager.getCurrentAudioDevice();
+        juce::String deviceName = (currentDevice != nullptr) ? currentDevice->getName() : "";
+        
+        bool isCurrentlyHelix = deviceName.containsIgnoreCase("Helix") || 
+                                deviceName.containsIgnoreCase("Line 6") || 
+                                deviceName.containsIgnoreCase("Line6");
+        
+        if (isCurrentlyHelix)
+        {
+            wasUsingHelix = true;
+            
+            // Watch if it gets disconnected
+            if (lastHelixState == HelixState::Connected && ! isHelixHardwareConnected())
+            {
+                lastHelixState = HelixState::Disconnected;
+                handleHelixDisconnection();
+            }
+        }
+        else
+        {
+            // If we were using the Helix and it is in disconnected state, check if we can reconnect
+            if (wasUsingHelix && lastHelixState == HelixState::Disconnected)
+            {
+                if (isHelixHardwareConnected())
+                {
+                    lastHelixState = HelixState::Connected;
+                    handleHelixReconnection();
+                }
+            }
+        }
+    }
+#endif
 }
 

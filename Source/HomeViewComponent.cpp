@@ -110,13 +110,13 @@ HomeViewComponent::HomeViewComponent()
     addAndMakeVisible (presetAnalyzerCard.get());
     presetAnalyzerCard->onClick = [this] { if (onModuleSelected) onModuleSelected(1); };
 
-    presetComparerCard = std::make_unique<ModuleCardComponent>(
-        "Preset Comparer", 
-        "Compara tomas A/B simultaneamente. Evalua diferencias de ganancia, respuesta en frecuencia y metricas dinamicas con el sistema de semaforizacion.", 
+    blockAnalyzerCard = std::make_unique<ModuleCardComponent>(
+        "BLOCK ANALIZER", 
+        "Analiza la respuesta en frecuencia (funcion de transferencia) y dinamica (compresion, knee y gain reduction) del pedalboard en tiempo real con inyeccion de ruido rosa.", 
         CustomLookAndFeel::defaultColourId
     );
-    addAndMakeVisible (presetComparerCard.get());
-    presetComparerCard->onClick = [this] { if (onModuleSelected) onModuleSelected(2); };
+    addAndMakeVisible (blockAnalyzerCard.get());
+    blockAnalyzerCard->onClick = [this] { if (onModuleSelected) onModuleSelected(2); };
 
     samplesAnalyzerCard = std::make_unique<ModuleCardComponent>(
         "Samples Analyzer", 
@@ -147,6 +147,6 @@ void HomeViewComponent::resized()
     presetAnalyzerCard->setBounds (bounds.getX() + cardWidth + cardGap, bounds.getY(), cardWidth, cardHeight);
 
     // Fila 2
-    presetComparerCard->setBounds (bounds.getX(), bounds.getY() + cardHeight + cardGap, cardWidth, cardHeight);
+    blockAnalyzerCard->setBounds (bounds.getX(), bounds.getY() + cardHeight + cardGap, cardWidth, cardHeight);
     samplesAnalyzerCard->setBounds (bounds.getX() + cardWidth + cardGap, bounds.getY() + cardHeight + cardGap, cardWidth, cardHeight);
 }

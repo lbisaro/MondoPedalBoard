@@ -8,6 +8,7 @@
 #include "GuitarDIRecorderViewComponent.h"
 #include "PresetAnalyzerViewComponent.h"
 #include "SamplesAnalyzerViewComponent.h"
+#include "BlockAnalyzerViewComponent.h"
 
 class MondoHelixAnalyzerAudioProcessorEditor : public juce::AudioProcessorEditor
 {
@@ -32,6 +33,7 @@ private:
     std::unique_ptr<GuitarDIRecorderViewComponent> diRecorderView;
     std::unique_ptr<PresetAnalyzerViewComponent> analyzerView;
     std::unique_ptr<SamplesAnalyzerViewComponent> samplesAnalyzerView;
+    std::unique_ptr<BlockAnalyzerViewComponent> blockAnalyzerView;
 
     juce::Component* currentView = nullptr;
     juce::String currentModuleTitle;

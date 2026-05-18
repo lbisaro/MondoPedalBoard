@@ -38,6 +38,7 @@ target_compile_definitions(MondoHelixAnalyzer PUBLIC
 # Enable ASIO on Windows for the Standalone plugin
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     target_compile_definitions(MondoHelixAnalyzer PUBLIC JUCE_ASIO=1)
+    target_link_libraries(MondoHelixAnalyzer PRIVATE setupapi)
 endif()
 
 # CoreAudio is enabled by default on macOS, but explicit declaration doesn't hurt
@@ -69,6 +70,9 @@ target_sources(MondoHelixAnalyzer PRIVATE
     Source/SamplesAnalyzerViewComponent.cpp
     Source/SamplesAnalyzerViewComponent.h
     Source/SamplesOfflineAnalyzer.h
+    Source/BlockAnalyzer.h
+    Source/BlockAnalyzerViewComponent.h
+    Source/BlockAnalyzerViewComponent.cpp
 )
 
 # (Se eliminó la opción PCH temporalmente por problemas de parseo en CMake/MSVC)

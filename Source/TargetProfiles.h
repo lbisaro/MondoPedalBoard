@@ -18,7 +18,7 @@ constexpr float BRILLO_100 = 3000.0f;
 constexpr float CUERPO_000 = 0.0f;
 constexpr float CUERPO_100 = 60.0f;
 constexpr float CORTE_000 = 10.0f;
-constexpr float CORTE_100 = 40.0f;
+constexpr float CORTE_100 = 60.0f;
 constexpr float BRILLO_RATIO_000 = 0.0f;
 constexpr float BRILLO_RATIO_100 = 70.0f;
 
@@ -34,7 +34,7 @@ constexpr float AMBIENT_PLR_MAX = 15.0f;
 constexpr float AMBIENT_BRILLO_MIN = 600.0f;
 constexpr float AMBIENT_BRILLO_MAX = 1500.0f;
 
-constexpr float AMBIENT_CUERPO_MIN = NO_LIMIT; // Sin mínimo
+constexpr float AMBIENT_CUERPO_MIN = NO_LIMIT;
 constexpr float AMBIENT_CUERPO_MAX = 15.0f;
 
 constexpr float AMBIENT_CORTE_MIN = NO_LIMIT;

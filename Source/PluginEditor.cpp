@@ -20,6 +20,7 @@ MondoHelixAnalyzerAudioProcessorEditor::MondoHelixAnalyzerAudioProcessorEditor (
     diRecorderView = std::make_unique<GuitarDIRecorderViewComponent>(audioProcessor);
     analyzerView = std::make_unique<PresetAnalyzerViewComponent>(audioProcessor);
     samplesAnalyzerView = std::make_unique<SamplesAnalyzerViewComponent>(audioProcessor.settings);
+    blockAnalyzerView = std::make_unique<BlockAnalyzerViewComponent>(audioProcessor);
     settingsPanel = std::make_unique<SettingsComponent>(audioProcessor.settings);
 
     // Configurar enrutamiento (Routing)
@@ -36,11 +37,7 @@ MondoHelixAnalyzerAudioProcessorEditor::MondoHelixAnalyzerAudioProcessorEditor (
         }
         else if (moduleIndex == 2)
         {
-            juce::AlertWindow::showMessageBoxAsync (
-                juce::AlertWindow::InfoIcon,
-                "Modulo en Desarrollo",
-                "El modulo 'Preset Comparer' estara disponible en la proxima actualizacion de la suite."
-            );
+            showView (blockAnalyzerView.get(), "BLOCK ANALIZER");
         }
         else if (moduleIndex == 3)
         {
@@ -121,8 +118,11 @@ void MondoHelixAnalyzerAudioProcessorEditor::showView (juce::Component* newView,
     {
         // Si el usuario está abandonando el módulo del Analizador, detenemos automáticamente
         // la reproducción del loop DI para ahorrar ciclos de CPU en el motor DSP.
-        if (currentView == analyzerView.get() && newView != analyzerView.get())
+        if ((currentView == analyzerView.get() || currentView == blockAnalyzerView.get()) && newView != currentView)
+        {
             audioProcessor.stopDI();
+            audioProcessor.useModulatedNoise.store (false);
+        }
 
         removeChildComponent (currentView);
     }
