@@ -18,8 +18,7 @@ MondoHelixAnalyzerAudioProcessor::MondoHelixAnalyzerAudioProcessor()
      : AudioProcessor (BusesProperties()
                      .withInput  ("Input",  juce::AudioChannelSet::discreteChannels(8), true)
                      .withOutput ("Output", juce::AudioChannelSet::discreteChannels(8), true)
-                     ),
-       emulatorSequencer(guitarSynth)
+                     )
 #endif
 {
     startTimer (200);
@@ -81,14 +80,7 @@ void MondoHelixAnalyzerAudioProcessor::prepareToPlay (double sampleRate, int sam
     juce::ignoreUnused (samplesPerBlock);
     currentSampleRate = sampleRate > 0.0 ? sampleRate : 44100.0;
     analyzer.prepare(currentSampleRate);
-    guitarSynth.prepare(currentSampleRate);
     blockAnalyzer.prepare(currentSampleRate);
-    
-    juce::dsp::ProcessSpec spec;
-    spec.sampleRate = currentSampleRate;
-    spec.maximumBlockSize = uint32_t(samplesPerBlock);
-    spec.numChannels = 1;
-    emulatorSequencer.prepare(spec);
     
     // Asignar búfer para hasta 5 minutos de grabación DI mono en RAM
     diRecordBuffer.setSize (1, static_cast<int>(currentSampleRate * 60.0 * 5.0));
@@ -98,6 +90,10 @@ void MondoHelixAnalyzerAudioProcessor::prepareToPlay (double sampleRate, int sam
     // Asignar búfer temporal para la copia limpia de la señal procesada del BlockAnalyzer
     blockAnalyzerInputBackup.setSize (1, samplesPerBlock);
     blockAnalyzerInputBackup.clear();
+
+    // Inicializar el buffer de respaldo de entrada completo
+    inputBackupBuffer.setSize (8, samplesPerBlock);
+    inputBackupBuffer.clear();
 }
 
 void MondoHelixAnalyzerAudioProcessor::releaseResources()
@@ -136,25 +132,35 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
     int diIdx = settings.diInputChannel.load() - 1;
     int outIdx = settings.playbackOutputChannel.load() - 1;
 
-    // Respaldar la señal de retorno procesada (procIdx) de la Helix antes de que sea borrada por el flujo de salida
+    // 0. Respaldar la señal de entrada completa antes de cualquier modificación
+    if (inputBackupBuffer.getNumChannels() != totalNumInputChannels || inputBackupBuffer.getNumSamples() != buffer.getNumSamples())
+    {
+        inputBackupBuffer.setSize (totalNumInputChannels, buffer.getNumSamples(), false, false, true);
+    }
+    inputBackupBuffer.clear();
+    for (int ch = 0; ch < totalNumInputChannels; ++ch)
+    {
+        inputBackupBuffer.copyFrom (ch, 0, buffer, ch, 0, buffer.getNumSamples());
+    }
+
+    // Respaldar la señal de retorno procesada (procIdx) de la Helix para el BlockAnalyzer
     if (procIdx >= 0 && procIdx < totalNumInputChannels)
     {
-        // Redimensionar por seguridad si el tamaño de bloque difiere dinámicamente
         if (blockAnalyzerInputBackup.getNumSamples() != buffer.getNumSamples())
             blockAnalyzerInputBackup.setSize (1, buffer.getNumSamples(), false, false, true);
 
-        blockAnalyzerInputBackup.copyFrom (0, 0, buffer, procIdx, 0, buffer.getNumSamples());
+        blockAnalyzerInputBackup.copyFrom (0, 0, inputBackupBuffer, procIdx, 0, buffer.getNumSamples());
     }
     else
     {
         blockAnalyzerInputBackup.clear();
     }
 
-    // 1. Procesamiento de la señal DI de entrada (Lectura pura sin alterar el buffer)
+    // 1. Procesamiento de la señal DI de entrada (Lectura pura desde el backup)
     float maxDI = 0.0f;
     if (diIdx >= 0 && diIdx < totalNumInputChannels)
     {
-        auto* channelDI = buffer.getReadPointer(diIdx);
+        auto* channelDI = inputBackupBuffer.getReadPointer(diIdx);
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
         {
             maxDI = juce::jmax(maxDI, std::abs(channelDI[sample]));
@@ -180,11 +186,11 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
     }
     diInputLevel.store (maxDI);
 
-    // 2. Procesamiento del audio estéreo principal para el Analyzer (Lectura pura de la señal entrante)
-    if (procIdx >= 0 && (procIdx + 1) < totalNumInputChannels)
+    // 2. Procesamiento del audio estéreo principal para el Analyzer (Lectura pura de la señal de entrada respaldada)
+    if (procIdx >= 0 && procIdx < totalNumInputChannels)
     {
         int diSourceIdx = (diIdx >= 0 && diIdx < totalNumInputChannels) ? diIdx : procIdx;
-        analyzer.processBlock (buffer, procIdx, diSourceIdx, isPlayingDI.load());
+        analyzer.processBlock (inputBackupBuffer, procIdx, diSourceIdx, isPlayingDI.load());
     }
 
     // 3. Preparación y ruteo hacia las salidas de Audio
@@ -197,18 +203,16 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
         // A. Inyección de señal hacia la Helix
         if (useLiveGuitar.load())
         {
-            // Guitarra en vivo: señal física, sin inyección artificial.
-        }
-        else if (useEmulator.load())
-        {
-            if (outIdx >= 0 && outIdx < totalNumOutputChannels)
+            // Guitarra en vivo: rutear la señal física de la guitarra (diIdx) hacia las salidas correspondientes
+            if (diIdx >= 0 && diIdx < totalNumInputChannels && outIdx >= 0 && outIdx < totalNumOutputChannels)
             {
                 auto* writeDIL = buffer.getWritePointer(outIdx);
                 auto* writeDIR = ((outIdx + 1) < totalNumOutputChannels) ? buffer.getWritePointer(outIdx + 1) : nullptr;
+                auto* readDI = inputBackupBuffer.getReadPointer(diIdx);
 
                 for (int i = 0; i < buffer.getNumSamples(); ++i)
                 {
-                    float sample = emulatorSequencer.getNextSample(currentSampleRate);
+                    float sample = readDI[i];
                     writeDIL[i] = sample;
                     if (writeDIR != nullptr) writeDIR[i] = sample;
                 }
@@ -239,21 +243,8 @@ void MondoHelixAnalyzerAudioProcessor::processBlock (juce::AudioBuffer<float>& b
             diPlaybackPosition.store(pbPos);
         }
 
-        // B. Monitoreo: Pasar el retorno de la Helix (procIdx) a las salidas de escucha (0 y 1)
-        // Esto permite que el usuario ESCUCHE el resultado del análisis en tiempo real.
-        if (procIdx >= 0 && procIdx < totalNumInputChannels)
-        {
-            // Solo copiamos si los canales de salida 0 y 1 existen y no son los mismos que usamos para enviar DI
-            if (totalNumOutputChannels >= 2)
-            {
-                if (outIdx != 0) buffer.copyFrom (0, 0, buffer.getReadPointer(procIdx), buffer.getNumSamples());
-                if (outIdx != 1) 
-                {
-                    int srcR = (procIdx + 1 < totalNumInputChannels) ? procIdx + 1 : procIdx;
-                    buffer.copyFrom (1, 0, buffer.getReadPointer(srcR), buffer.getNumSamples());
-                }
-            }
-        }
+        // B. Monitoreo: Se removió el monitoreo por software para evitar duplicación de audio (eco),
+        // ya que la Helix rutea directamente la señal procesada a sus salidas físicas principales.
     }
     else
     {
@@ -397,22 +388,17 @@ void MondoHelixAnalyzerAudioProcessor::loadDIForPlayback(const juce::File& file)
 void MondoHelixAnalyzerAudioProcessor::playDI()
 {
     diPlaybackPosition.store (0);
-    if (useEmulator.load())
-        emulatorSequencer.start();
-        
     isPlayingDI.store (true);
 }
 
 void MondoHelixAnalyzerAudioProcessor::stopDI()
 {
     isPlayingDI.store(false);
-    emulatorSequencer.stop();
 }
 
 void MondoHelixAnalyzerAudioProcessor::setEmulatorActive(bool active)
 {
     useEmulator.store(active);
-    if (!active) emulatorSequencer.stop();
 }
 
 bool MondoHelixAnalyzerAudioProcessor::isDIPlaying() const

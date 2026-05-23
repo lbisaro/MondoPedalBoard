@@ -19,12 +19,8 @@ PresetAnalyzerViewComponent::PresetAnalyzerViewComponent(
   diComboBox.onChange = [this] {
     int selId = diComboBox.getSelectedId();
     bool isLive = (selId == liveGuitarId);
-    bool isPink = (selId == pinkNoiseId);
-    bool isEmulator = (selId == emulatorId);
 
     audioProcessor.setLiveGuitarActive(isLive);
-    audioProcessor.useInternalNoise.store(isPink);
-    audioProcessor.setEmulatorActive(isEmulator);
     playButton.setEnabled(selId > 0);
   };
 
@@ -50,25 +46,11 @@ PresetAnalyzerViewComponent::PresetAnalyzerViewComponent(
     int selId = diComboBox.getSelectedId();
     if (selId == liveGuitarId) {
       audioProcessor.setLiveGuitarActive(true);
-      audioProcessor.useInternalNoise.store(false);
-      audioProcessor.setEmulatorActive(false);
-      audioProcessor.playDI();
-    } else if (selId == pinkNoiseId) {
-      audioProcessor.setLiveGuitarActive(false);
-      audioProcessor.useInternalNoise.store(true);
-      audioProcessor.setEmulatorActive(false);
-      audioProcessor.playDI();
-    } else if (selId == emulatorId) {
-      audioProcessor.setLiveGuitarActive(false);
-      audioProcessor.useInternalNoise.store(false);
-      audioProcessor.setEmulatorActive(true);
       audioProcessor.playDI();
     } else if (selId > 0) {
       int fileIdx = selId - 2; // Offset by 1 (Guitar Live) and 1-based indexing
       if (fileIdx >= 0 && fileIdx < diFiles.size()) {
         audioProcessor.setLiveGuitarActive(false);
-        audioProcessor.useInternalNoise.store(false);
-        audioProcessor.setEmulatorActive(false);
         audioProcessor.loadDIForPlayback(diFiles[fileIdx]);
         audioProcessor.playDI();
       }
@@ -142,17 +124,9 @@ void PresetAnalyzerViewComponent::refreshDIList() {
     diComboBox.addItem(f.getFileNameWithoutExtension(), id++);
   }
 
-  pinkNoiseId = id++;
-  diComboBox.addItem("Pink Noise (Internal)", pinkNoiseId);
-
-  emulatorId = id++;
-  diComboBox.addItem("Run Full Calibration (Internal)", emulatorId);
-
   // Dejamos por default "Guitar (Live)"
   diComboBox.setSelectedId(liveGuitarId, juce::dontSendNotification);
   audioProcessor.setLiveGuitarActive(true);
-  audioProcessor.useInternalNoise.store(false);
-  audioProcessor.setEmulatorActive(false);
 
   playButton.setEnabled(true);
   refreshTargetList();
@@ -242,9 +216,8 @@ void PresetAnalyzerViewComponent::paint(juce::Graphics &g) {
   // Dibujar barra horizontal de duración y avance si está reproduciendo un
   // archivo DI físico
   bool playing = audioProcessor.isDIPlaying();
-  bool isInternal = audioProcessor.useInternalNoise.load();
 
-  if (playing && !isInternal) {
+  if (playing) {
     float progress = audioProcessor.getDIPlaybackProgress();
     double totalSecs = audioProcessor.getDITotalDurationSeconds();
     double currentSecs = totalSecs * static_cast<double>(progress);
@@ -442,8 +415,7 @@ void PresetAnalyzerViewComponent::timerCallback() {
                                 outCh, outCh + 1, inCh, inCh + 1),
         juce::dontSendNotification);
 
-    if (!audioProcessor.useInternalNoise.load())
-      repaint(progressBarBounds);
+    repaint(progressBarBounds);
   } else {
     routingStatusLabel.setText("Ruta en reposo (Transporte detenido)",
                                juce::dontSendNotification);

@@ -1,9 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "AnalysisEngine.h"
-#include "GuitarEmulator.h"
 #include "AppSettings.h"
-#include "PinkNoiseGenerator.h"
 
 #include "BlockAnalyzer.h"
 
@@ -39,9 +37,6 @@ public:
 
     AnalysisEngine analyzer;
     AppSettings settings;
-    PinkNoiseGenerator pinkNoiseGen;
-    GuitarStringSynth guitarSynth;
-    CalibrationSequencer emulatorSequencer;
     BlockAnalyzer blockAnalyzer;
     
     std::atomic<bool> useInternalNoise { false };
@@ -96,6 +91,7 @@ private:
     juce::AudioBuffer<float> diRecordBuffer;
     std::atomic<int> diRecordSampleCount { 0 };
     juce::AudioBuffer<float> blockAnalyzerInputBackup;
+    juce::AudioBuffer<float> inputBackupBuffer;
     double currentSampleRate = 44100.0;
     double sweepPhase = 0.0;
 

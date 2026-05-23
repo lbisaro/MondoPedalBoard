@@ -36,8 +36,6 @@ private:
     juce::Array<juce::File> diFiles;
     juce::Array<juce::File> customTargetFiles;
     int liveGuitarId = 1;
-    int pinkNoiseId = 2;
-    int emulatorId = 3;
 
     RangeIndicator lufsGauge;
     RangeIndicator plrGauge;
